@@ -26,3 +26,4 @@ void dec_one_round(const block& c, const word& k, block& p);
 void expand_key(const word mk[], word keys[], const uint32_t& nr);
 void encrypt(const block& p, const word keys[], const uint32_t& nr, block& c);
 void decrypt(const block& c, const word keys[], const uint32_t& nr, block& p);
+bool check_testvector();

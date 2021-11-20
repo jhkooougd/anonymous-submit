@@ -58,7 +58,7 @@ void verify_search(double bs, const block c0[], const block c1[], const uint32_t
     block *e0 = new block[structure_size], *e1 = new block[structure_size];
     uint32_t *X = new uint32_t[structure_size];
     word sur_kg12, sur_kg11;
-    double score, Z;
+    double score;
     bk11 = kg11;
     bk12 = kg12;
     for (word x : hd_7) {
@@ -70,8 +70,7 @@ void verify_search(double bs, const block c0[], const block c1[], const uint32_t
             extrac_bits_to_uint(structure_size, e0, e1, X, bits);
             score = 0;
             for (int i = 0; i < structure_size; i++) {
-                Z = nd[X[i]];
-                score += log2(Z / (1 - Z));
+                score += nd[X[i]];
             }
             if (score > bs) {
                 bs = score;
@@ -116,12 +115,12 @@ void make_homogeneous_set(const block& diff, const vector<neutral_bit>& neutral_
     }
 }
 
-void attack_with_three_NDs(const uint32_t& nr, const block& diff, const uint32_t c[], const float* nd_table[], const vector<uint32_t>* bits[], const vector<neutral_bit>& NBs,
+void attack_with_three_NDs(const uint32_t& nr, const block& diff, const double c[], const float* nd_table[], const vector<uint32_t>* bits[], const vector<neutral_bit>& NBs,
                             word& dk_11, word& dk_12, double& time_cost, uint32_t& structure_consumption) {
     word key[M];
     word ks[MAX_NR];
     word sk12, sk11;
-    double score, Z;
+    double score;
     const uint32_t structure_size = 1 << NBs.size();
     block *p0 = new block[structure_size], *p1 = new block[structure_size];
     block *c0 = new block[structure_size], *c1 = new block[structure_size];
@@ -145,8 +144,7 @@ void attack_with_three_NDs(const uint32_t& nr, const block& diff, const uint32_t
             extrac_bits_to_uint(structure_size, d0, d1, X, *bits[0]);
             score = 0;
             for (int i = 0; i < structure_size; i++) {
-                Z = nd_table[0][X[i]];
-                score += log2(Z / (1 - Z));
+                score += nd_table[0][X[i]];
             }
             if (score > c[0]) {
                 for (word kg_12_H = 0; kg_12_H < (1 << 9); kg_12_H++) {
@@ -155,8 +153,7 @@ void attack_with_three_NDs(const uint32_t& nr, const block& diff, const uint32_t
                     extrac_bits_to_uint(structure_size, d0, d1, X, *bits[1]);
                     score = 0;
                     for (int i = 0; i < structure_size; i++) {
-                        Z = nd_table[1][X[i]];
-                        score += log2(Z / (1 - Z));
+                        score += nd_table[1][X[i]];
                     }
                     if (score > c[1]) {
                         for (word kg_11 = 0; kg_11 < (1 << 6); kg_11++) {
@@ -164,8 +161,7 @@ void attack_with_three_NDs(const uint32_t& nr, const block& diff, const uint32_t
                             extrac_bits_to_uint(structure_size, e0, e1, X, *bits[2]);
                             score = 0;
                             for (int i = 0; i < structure_size; i++) {
-                                Z = nd_table[2][X[i]];
-                                score += log2(Z / (1 - Z));
+                                score += nd_table[2][X[i]];
                             }
                             if (score > c[2]) {
                                 word bk_11, bk_12;
@@ -186,8 +182,7 @@ void attack_with_three_NDs(const uint32_t& nr, const block& diff, const uint32_t
                             extrac_bits_to_uint(structure_size, e0, e1, X, *bits[2]);
                             score = 0;
                             for (int i = 0; i < structure_size; i++) {
-                                Z = nd_table[2][X[i]];
-                                score += log2(Z / (1 - Z));
+                                score += nd_table[2][X[i]];
                             }
                             if (score > c[2]) {
                                 word bk_11, bk_12;
@@ -208,7 +203,7 @@ void attack_with_three_NDs(const uint32_t& nr, const block& diff, const uint32_t
     }
 }
 
-void test(const uint32_t& t, const uint32_t& nr, const block& diff, const uint32_t c[], const float* nd_table[], const vector<uint32_t>* bits[], const vector<neutral_bit>& NBs) {
+void test(const uint32_t& t, const uint32_t& nr, const block& diff, const double c[], const float* nd_table[], const vector<uint32_t>* bits[], const vector<neutral_bit>& NBs) {
     double structure_sum = 0, time_sum = 0, acc = 0;
     for (int i = 0; i < t; i++) {
         double time_cost;
@@ -219,7 +214,13 @@ void test(const uint32_t& t, const uint32_t& nr, const block& diff, const uint32
         printf("the number of tested structures is %d\n", structure_consumption);
         printf("time consumption of current attack is %f\n", time_cost);
         printf("differences between kg and sk are (0x%x, 0x%x)\n", dk_11, dk_12);
-        if (dk_12 == 0) acc += 1;
+        uint32_t d = 0;
+        word tmp = dk_11;
+        for (int j = 0; j < 6; j++) {
+            d += tmp & 1;
+            tmp >>= 1;
+        }
+        if (dk_12 == 0 && d <= 1) acc += 1;
         time_sum += time_cost;
         structure_sum += structure_consumption;
         fout << hex << dk_11 << ' ' << dk_12 << ' ' << time_cost << ' ' << dec << structure_consumption << endl;
@@ -230,6 +231,7 @@ void test(const uint32_t& t, const uint32_t& nr, const block& diff, const uint32
 }
 
 int main() {
+    check_testvector();
     string res_file = "./key_recovery_res/12_round_attack/attack_res";
     fout.open(res_file);
     srand(time(0));
@@ -244,7 +246,7 @@ int main() {
     load_table_from_file("./14_11_5_4_nd7_table", table_2, 1 << 24);
     load_table_from_file("./14_9_nd6_table", table_3, 1 << 24);
     float* tables[3] = {table_1, table_2, table_3};
-    uint32_t c[3] = {10, 8, 30};
+    double c[3] = {10, 8, 30};
     test(100, 12, {0x8020, 0x4101}, c, (const float**)tables, (const vector<uint32_t>**)bits, neutral_bits);
     delete[] table_1, table_2, table_3;
     fout.close();
