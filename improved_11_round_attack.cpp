@@ -7,11 +7,10 @@
 #include <fstream>
 #include <math.h>
 #include <string>
+#include <algorithm>
 
 static vector<word> hd_7, hd_6;
 static ofstream fout;
-static uint32_t process_num_stage1 = 0, process_num_stage2 = 0, process_num_stage3 = 0;
-static uint32_t process_valid_num_stage1 = 0, process_valid_num_stage2 = 0, process_valid_num_stage3 = 0;
 
 void generate_hd() {
     // hd_7
@@ -84,13 +83,31 @@ void verify_search(double bs, const block c0[], const block c1[], const uint32_t
     delete[] d0, d1, e0, e1, X;
 }
 
-void load_table_from_file(const char *path, float table[], const uint32_t& table_size) {
+bool load_table_from_file(const char *path, float table[], const uint32_t& table_size) {
     ifstream fin(path, ios::in | ios::binary);
+    if (sizeof(float) != 4) {
+        printf("the size of float is not 4 bytes!\n");
+        return false;
+    }
     if (!fin.is_open()) {
         printf("fail to open file!\n");
+        return false;
     }
-    fin.read((char *)table, sizeof(float) * table_size);
+    fin.read((char*)table, 4 * table_size);
     fin.close();
+    
+    // test machine endianness
+    uint32_t test_int = 0x12345678;
+    unsigned char *p = (unsigned char*)(&test_int);
+    if (*p != 0x78) {
+        // big endian
+        char *tmp = (char*)table;
+        for (int i = 0; i < 4 * table_size; i += 4) {
+            swap(tmp[i], tmp[i + 3]);
+            swap(tmp[i + 1], tmp[i + 2]);
+        }
+    }
+    return true;
 }
 
 void make_homogeneous_set(const block& diff, const vector<neutral_bit>& neutral_bits, block p0[], block p1[]) {
@@ -136,44 +153,40 @@ void attack_with_three_NDs(const uint32_t& nr, const block& diff, const double c
     sk11 = ks[nr - 1], sk10 = ks[nr - 2];
     printf("true subkey is (0x%x, 0x%x)\n", sk10 & 0x3f, sk11);
     while (true) {
+        // generate a plaintext structure
         make_homogeneous_set(diff, NBs, p0, p1);
         for (int i = 0; i < structure_size; i++) dec_one_round(p0[i], 0, p0[i]), dec_one_round(p1[i], 0, p1[i]);
-        for (int i = 0; i < structure_size; i++) encrypt(p0[i], ks, 3, c0[i]), encrypt(p1[i], ks, 3, c1[i]);
-        uint32_t valid_num = 0;
-        for (int i = 0; i < structure_size; i++) {
-            if ((c0[i].first ^ c1[i].first) == 0x40 && (c0[i].second ^ c1[i].second) == 0) valid_num++;
-            else break;
-        }
         for (int i = 0; i < structure_size; i++) encrypt(p0[i], ks, nr, c0[i]), encrypt(p1[i], ks, nr, c1[i]);
         num += 1;
+        // stage 1: guess kg_11[5~0]
         for (word kg_11_L = 0; kg_11_L < (1 << 6); kg_11_L++) {
             for (int i = 0; i < structure_size; i++) dec_one_round(c0[i], kg_11_L, d0[i]), dec_one_round(c1[i], kg_11_L, d1[i]);
             extrac_bits_to_uint(structure_size, d0, d1, X, *bits[0]);
             score = 0;
+            // access lookup table 1 and calculate key guess score
             for (int i = 0; i < structure_size; i++) {
-                process_num_stage1++;
-                if (valid_num == structure_size) process_valid_num_stage1++;
                 score += nd_table[0][X[i]];
             }
             if (score > c[0]) {
+                // stage 2: guess kg_11[14~6]
                 for (word kg_11_H = 0; kg_11_H < (1 << 9); kg_11_H++) {
                     word kg_11 = (kg_11_H << 6) | kg_11_L;
                     for (int i = 0; i < structure_size; i++) dec_one_round(c0[i], kg_11, d0[i]), dec_one_round(c1[i], kg_11, d1[i]);
                     extrac_bits_to_uint(structure_size, d0, d1, X, *bits[1]);
                     score = 0;
+                    // access lookup table 2 and calculate key guess score
                     for (int i = 0; i < structure_size; i++) {
-                        if (valid_num == structure_size) process_valid_num_stage2++;
-                        process_num_stage2++;
                         score += nd_table[1][X[i]];
                     }
                     if (score > c[1]) {
+                        // stage 3: guess (kg_10[5~0], kg_11[15])
+                        // kg_11[15] == 0: guess kg_10[5~0]
                         for (word kg_10 = 0; kg_10 < (1 << 6); kg_10++) {
                             for (int i = 0; i < structure_size; i++) dec_one_round(d0[i], kg_10, e0[i]), dec_one_round(d1[i], kg_10, e1[i]);
                             extrac_bits_to_uint(structure_size, e0, e1, X, *bits[2]);
                             score = 0;
+                            // access lookup table 3 and calculate key guess score
                             for (int i = 0; i < structure_size; i++) {
-                                if (valid_num == structure_size) process_valid_num_stage3++;
-                                process_num_stage3++;
                                 score += nd_table[2][X[i]];
                             }
                             if (score > c[2]) {
@@ -188,15 +201,15 @@ void attack_with_three_NDs(const uint32_t& nr, const block& diff, const double c
                                 return;
                             }
                         }
+                        // kg_11[15] == 1: guess kg_10[5~0]
                         word kg_11_n = kg_11 | (1 << 15);
                         for (int i = 0; i < structure_size; i++) dec_one_round(c0[i], kg_11_n, d0[i]), dec_one_round(c1[i], kg_11_n, d1[i]);
                         for (word kg_10 = 0; kg_10 < (1 << 6); kg_10++) {
                             for (int i = 0; i < structure_size; i++) dec_one_round(d0[i], kg_10, e0[i]), dec_one_round(d1[i], kg_10, e1[i]);
                             extrac_bits_to_uint(structure_size, e0, e1, X, *bits[2]);
                             score = 0;
+                            // access lookup table 3 and calculate key guess score
                             for (int i = 0; i < structure_size; i++) {
-                                if (valid_num == structure_size) process_valid_num_stage3++;
-                                process_num_stage3++;
                                 score += nd_table[2][X[i]];
                             }
                             if (score > c[2]) {
@@ -240,12 +253,6 @@ void test(const uint32_t& t, const uint32_t& nr, const block& diff, const double
         structure_sum += structure_consumption;
         fout << hex << dk_10 << ' ' << dk_11 << ' ' << time_cost << ' ' << dec << structure_consumption << endl;
     }
-    printf("the average valid process num in stage1 is %f\n", (process_valid_num_stage1 + 0.0) / t);
-    printf("the average valid process num in stage2 is %f\n", (process_valid_num_stage2 + 0.0) / t);
-    printf("the average valid process num in stage3 is %f\n", (process_valid_num_stage3 + 0.0) / t);
-    printf("the average process num in stage1 is %f\n", (process_num_stage1 + 0.0) / t);
-    printf("the average process num in stage2 is %f\n", (process_num_stage2 + 0.0) / t);
-    printf("the average process num in stage3 is %f\n", (process_num_stage3 + 0.0) / t);
     printf("the average time consumption is %f\n", time_sum / t);
     printf("the average number of structure consumption is %f\n", structure_sum / t);
     printf("the accuracy is %f\n", acc / t);
@@ -263,13 +270,23 @@ int main() {
     vector<uint32_t>* bits[3] = {&bits1_for_ND7, &bits2_for_ND7, &bits3_for_ND6};
     vector<neutral_bit> neutral_bits({{1,{20}}, {1,{21}}, {1,{22}}, {2,{9,16}}, {3,{2,11,25}}, {1,{14}}, {1,{15}}, {2,{6,29}}, {1,{23}}, {1,{30}}});
     float *table_1 = new float[1 << 24], *table_2 = new float[1 << 24], *table_3 = new float[1 << 24];
-    load_table_from_file("./12_7_nd7_table", table_1, 1 << 24);
-    load_table_from_file("./14_11_5_4_nd7_table", table_2, 1 << 24);
-    load_table_from_file("./14_9_nd6_table", table_3, 1 << 24);
+    if (!load_table_from_file("./12_7_nd7_table", table_1, 1 << 24)) {
+        printf("loading table from file failed!\n");
+        return 0;
+    }
+    if (!load_table_from_file("./14_11_5_4_nd7_table", table_2, 1 << 24)) {
+        printf("loading table from file failed!\n");
+        return 0;
+    }
+    if (!load_table_from_file("./14_9_nd6_table", table_3, 1 << 24)) {
+        printf("loading table from file failed!\n");
+        return 0;
+    }
     float* tables[3] = {table_1, table_2, table_3};
     double c[3] = {30, 40, 80};
     test(1000, 11, {0x211, 0xa04}, c, (const float**)tables, (const vector<uint32_t>**)bits, neutral_bits);
 
+    // only use the first eight neutral bits
     // vector<neutral_bit> neutral_bits_2({{1,{20}}, {1,{21}}, {1,{22}}, {2,{9,16}}, {3,{2,11,25}}, {1,{14}}, {1,{15}}, {2,{6,29}}});
     // double c_2[3] = {7.5, 10, 20};
     // test(1000, 11, {0x211, 0xa04}, c_2, (const float**)tables, (const vector<uint32_t>**)bits, neutral_bits_2);
