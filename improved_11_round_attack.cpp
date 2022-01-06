@@ -266,7 +266,7 @@ int main() {
     generate_hd();
     vector<uint32_t> bits1_for_ND7 = {12, 11, 10, 9, 8, 7};
     vector<uint32_t> bits2_for_ND7 = {14, 13, 12, 11, 5, 4};
-    vector<uint32_t> bits3_for_ND6 = {14, 13, 12, 11, 10, 9};
+    vector<uint32_t> bits3_for_ND6 = {12, 11, 10, 9, 8, 7};
     vector<uint32_t>* bits[3] = {&bits1_for_ND7, &bits2_for_ND7, &bits3_for_ND6};
     vector<neutral_bit> neutral_bits({{1,{20}}, {1,{21}}, {1,{22}}, {2,{9,16}}, {3,{2,11,25}}, {1,{14}}, {1,{15}}, {2,{6,29}}, {1,{23}}, {1,{30}}});
     float *table_1 = new float[1 << 24], *table_2 = new float[1 << 24], *table_3 = new float[1 << 24];
@@ -278,7 +278,7 @@ int main() {
         printf("loading table from file failed!\n");
         return 0;
     }
-    if (!load_table_from_file("./14_9_nd6_table", table_3, 1 << 24)) {
+    if (!load_table_from_file("./12_7_nd6_table", table_3, 1 << 24)) {
         printf("loading table from file failed!\n");
         return 0;
     }
