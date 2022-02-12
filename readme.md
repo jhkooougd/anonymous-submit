@@ -1,6 +1,6 @@
 # 1 Summary
 
-This repository holds supplementary code of the paper "Improved Deep Learning-based Attack with Application to Round Reduced Speck32/64". It contains:
+This repository holds supplementary code of the paper "Analysis and Improvements of Deep Learning-based Key Recovery Attack". It contains:
 
 * three lookup tables (12_7_nd7_table, 14_11_5_4_nd7_table and 14_9_nd6_table) mentioned in this paper. Each table is a 64 MB binary file containing 2\*\*24 floating point numbers representing 2\*\*24 entries of neutral distinguisher, and the size of each floating point number is 4 bytes,
 * a C++ implementation of Speck32/64 (speck.cpp and speck.h),
