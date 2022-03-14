@@ -7,7 +7,11 @@ This repository holds supplementary code of the paper "Analysis and Improvements
 * the code written in C++ of the improved attack on 11-round Speck32/64 (improved_11_round_attack.cpp),
 * the code written in C++ of the improved attack on 12-round Speck32/64 (improved_12_round_attack.cpp).
 
+Related code of Python version is also provided in the folder improved_attack_on_speck32_py.
+
 # 2 Compiling the attack code
+
+## 2.1 Compiling the attack code in C++
 
 There are two ways to compile the attack code:
 
@@ -24,3 +28,10 @@ Method 2: Compile the attack code using your own IDE:
 
 1. Note that there's a main function both in improved_11_round_attack.cpp and improved_12_round_attack.cpp. So use improved_11_round_attack.cpp, speck.h and speck.cpp  to test 11-round attack and use improved_12_round_attack.cpp, speck.h and speck.cpp to test 12-round attack.
 7. Please test the attacks in Release mode instead of Debug mode.
+
+## 2.2 Running the attack code in Python
+
+In the folder improved_attack_on_speck32_py:
+
+1. please run 11_round_attack.py and 11_round_attack_under_fair_settings.py to test attacks against 11-round Speck32/64,
+2. please run the script 12_round_attack.py to test the attack against 12-round Speck32/64.
